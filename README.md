@@ -1,7 +1,7 @@
 # BIP
 https://drive.google.com/drive/folders/1xdHsuUFHPPYn_TT4uY2f-lZW0b2KxaI5
 
-
+"""
 import time
 from zeep import Client
 from zeep.transports import Transport
@@ -45,3 +45,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+"""
