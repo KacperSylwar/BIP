@@ -1,6 +1,11 @@
 # BIP
 https://drive.google.com/drive/folders/1xdHsuUFHPPYn_TT4uY2f-lZW0b2KxaI5
 
+
+
+(Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+
+
 """
 import time
 from zeep import Client
