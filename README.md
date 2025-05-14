@@ -6,6 +6,15 @@ https://drive.google.com/drive/folders/1xdHsuUFHPPYn_TT4uY2f-lZW0b2KxaI5
 (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
 
 
+
+[Environment]::SetEnvironmentVariable(
+  "Path",
+  [Environment]::GetEnvironmentVariable("Path", [EnvironmentVariableTarget]::User) + ";$env:USERPROFILE\.local\bin",
+  [EnvironmentVariableTarget]::User
+)
+
+
+
 """
 import time
 from zeep import Client
