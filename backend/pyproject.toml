@@ -1,17 +1,22 @@
-[project]
+[tool.poetry]
 name = "backend"
 version = "0.1.0"
 description = ""
 authors = [
-    {name = "Kacper Sylwar",email = "75886014+KacperSylwar@users.noreply.github.com"}
+    "Kacper Sylwar <75886014+KacperSylwar@users.noreply.github.com>"
 ]
 readme = "README.md"
-requires-python = ">=3.11"
-dependencies = [
-    "django (>=5.2.1,<6.0.0)",
-    "djangorestframework (>=3.16.0,<4.0.0)"
-]
 
+[tool.poetry.dependencies]
+python = ">=3.11,<4.0"
+django = ">=5.2.1,<6.0.0"
+djangorestframework = ">=3.16.0,<4.0.0"
+django-celery-beat = "^2.8.1"
+django-celery-results = "*"
+redis = "*"
+celery = "*"
+nordpool = "^0.4.5"
+zeep = "^4.3.1"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
