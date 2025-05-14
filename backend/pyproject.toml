@@ -17,6 +17,7 @@ redis = "*"
 celery = "*"
 nordpool = "^0.4.5"
 zeep = "^4.3.1"
+requests = "^2.32.3"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

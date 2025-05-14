@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import PriceArea, ElectricityPrice, ServerData
+from .models import PriceArea, ElectricityPrice, ServerData, CalculatedResult
 
 @admin.register(PriceArea)
 class PriceAreaAdmin(admin.ModelAdmin):
@@ -24,5 +24,14 @@ class ServerDataAdmin(admin.ModelAdmin):
     list_display = ('server_id', 'value', 'timestamp')
     search_fields = ('server_id',)
     list_filter = ('timestamp',)
+
+@admin.register(CalculatedResult)
+class CalculatedResultAdmin(admin.ModelAdmin):
+    list_display = ('name', 'source_id_1', 'source_value_1', 'source_id_2',
+                    'source_value_2', 'calculated_value', 'timestamp')
+    list_filter = ('name', 'source_id_1', 'source_id_2', 'timestamp')
+    search_fields = ('name', 'source_id_1', 'source_id_2')
+    date_hierarchy = 'timestamp'
+    readonly_fields = ('timestamp',)
 
 admin.site.register(ElectricityPrice, ElectricityPriceAdmin)

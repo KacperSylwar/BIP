@@ -10,9 +10,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends gcc python3-dev
 # Kopiowanie plików konfiguracyjnych
 COPY pyproject.toml poetry.lock* ./
 
-# Konfiguracja Poetry, aby nie używał wirtualnego środowiska
+# Aby naprawić błąd instalacji
+RUN touch README.md
+
+# Konfiguracja Poetry, aby nie używał wirtualnego środowiska i nie instalował bieżącego projektu
 RUN poetry config virtualenvs.create false && \
-    poetry install --no-interaction --no-ansi
+    poetry install --no-interaction --no-ansi --no-root
 
 # Kopiowanie kodu aplikacji
 COPY . .

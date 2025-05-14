@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'nordpool',
     'django_celery_beat',
     'django_celery_results',
+    'rest_framework'
 ]
 
 MIDDLEWARE = [
