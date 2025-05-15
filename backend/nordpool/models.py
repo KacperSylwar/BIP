@@ -102,3 +102,54 @@ class CalculatedResult(models.Model):
             # Obsługa innych błędów
             print(f"Błąd podczas obliczania wyniku: {e}")
             return None
+
+
+class SimulatedBattery(models.Model):
+    """
+    Model symulujący baterię, która przechowuje energię.
+    """
+    name = models.CharField(max_length=100)
+    capacity = models.DecimalField(max_digits=20, decimal_places=12)
+    current_charge = models.DecimalField(max_digits=20, decimal_places=12, default=0)
+    last_updated = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.name} - {self.current_charge}/{self.capacity}"
+
+
+class SimulatedSolarAndGridPower(models.Model):
+    """
+    Model symulujący moc z paneli słonecznych i z sieci.
+    """
+    solar_power = models.DecimalField(max_digits=20, decimal_places=12, default=0)
+    grid_power = models.DecimalField(max_digits=20, decimal_places=12, default=0)
+    usage = models.DecimalField(max_digits=20, decimal_places=12, default=0)
+    last_updated = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Solar: {self.solar_power}, Grid: {self.grid_power}"
+
+
+class OptimizationDecision(models.Model):
+    """
+    Model przechowujący historię decyzji algorytmu optymalizującego zarządzanie energią.
+    """
+    timestamp = models.DateTimeField(auto_now_add=True)
+    battery_level_before = models.DecimalField(max_digits=20, decimal_places=12)
+    battery_percentage_before = models.DecimalField(max_digits=5, decimal_places=2)
+    battery_level_after = models.DecimalField(max_digits=20, decimal_places=12)
+    battery_percentage_after = models.DecimalField(max_digits=5, decimal_places=2)
+    solar_power = models.DecimalField(max_digits=20, decimal_places=12)
+    grid_power = models.DecimalField(max_digits=20, decimal_places=12)
+    usage = models.DecimalField(max_digits=20, decimal_places=12)
+    surplus = models.DecimalField(max_digits=20, decimal_places=12)
+    current_price = models.DecimalField(max_digits=10, decimal_places=2)
+    avg_price = models.DecimalField(max_digits=10, decimal_places=2)
+    decision = models.CharField(max_length=255)
+    decision_reason = models.TextField()
+
+    class Meta:
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"{self.timestamp}: {self.decision}"
