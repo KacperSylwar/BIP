@@ -11,6 +11,14 @@
 <div class="container mx-auto p-6">
   <h1 class="text-3xl font-bold text-center mb-6">Team Green >:)</h1>
 
+  <!-- Progress Bar -->
+  <div id="progress-container" class="bg-white shadow-md rounded-lg p-4 mb-6">
+    <h2 class="text-xl font-semibold mb-4">Battery percentage</h2>
+    <div class="w-full bg-gray-200 rounded-full h-6">
+      <div id="progress-bar" class="bg-blue-500 h-6 rounded-full text-center text-white text-sm leading-6" style="width: 0%;">0%</div>
+    </div>
+  </div>
+
   <!-- Data Table -->
   <div id="data-container" class="bg-white shadow-md rounded-lg p-4 mb-6">
     <h2 class="text-xl font-semibold mb-4">Latest Data</h2>
@@ -46,6 +54,7 @@
 
 <script>
   const apiUrl = 'http://localhost:8000/api/latest-result/';
+  const progressApiUrl = 'http://localhost:8000/api/server-data/';
   let chart, sourceChart;
 
   // Initialize the charts
@@ -175,10 +184,31 @@
     }
   }
 
+  // Update the progress bar
+  async function updateProgressBar() {
+    try {
+      const response = await fetch(progressApiUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const progressValue = parseFloat(data.value);
+
+      const progressBar = document.getElementById('progress-bar');
+      progressBar.style.width = `${progressValue}%`;
+      progressBar.textContent = `${progressValue}%`;
+    } catch (error) {
+      document.getElementById('progress-container').innerHTML = `<p class="text-red-500">Error: ${error.message}</p>`;
+    }
+  }
+
   // Initialize the graphs and fetch data periodically
   createGraph();
   fetchData();
+  updateProgressBar();
   setInterval(fetchData, 3000);
+  setInterval(updateProgressBar, 3000);
 </script>
 </body>
 </html>
