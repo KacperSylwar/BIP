@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 WSDL_URL = 'http://172.16.16.60/EWS/DataExchange.svc?wsdl'
 USERNAME = 'kvk'
 PASSWORD = 'KvK-DataAccess1'
-VALUE_IDS = ["4@1042@V", "7@1042@V"]
+VALUE_IDS = ["4@1042@V", "7@1042@V",'9@-685@V']
 
 
 @shared_task
