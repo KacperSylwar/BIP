@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BIP Project</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-100 text-gray-800">
+<div class="container mx-auto p-6">
+  <h1 class="text-3xl font-bold text-center mb-6">Team Green >:)</h1>
+
+  <!-- Data Table -->
+  <div id="data-container" class="bg-white shadow-md rounded-lg p-4 mb-6">
+    <h2 class="text-xl font-semibold mb-4">Latest Data</h2>
+    <div class="overflow-x-auto">
+      <table class="table-auto w-full text-left border-collapse">
+        <thead>
+        <tr class="bg-gray-200">
+          <th class="px-4 py-2 border">Field</th>
+          <th class="px-4 py-2 border">Value</th>
+        </tr>
+        </thead>
+        <tbody id="data-table-body">
+        <!-- Data rows will be dynamically inserted here -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="grid grid-cols-2 gap-4">
+    <!-- Chart 1 -->
+    <div class="bg-white shadow-md rounded-lg p-4">
+      <h2 class="text-xl font-semibold mb-4">Calculated Value Chart</h2>
+      <canvas id="dataChart" class="w-full"></canvas>
+    </div>
+    <!-- Chart 2 -->
+    <div class="bg-white shadow-md rounded-lg p-4">
+      <h2 class="text-xl font-semibold mb-4">Source Values Chart</h2>
+      <canvas id="sourceChart" class="w-full"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+  const apiUrl = 'http://localhost:8000/api/latest-result/';
+  let chart, sourceChart;
+
+  // Initialize the charts
+  function createGraph() {
+    const ctx1 = document.getElementById('dataChart').getContext('2d');
+    chart = new Chart(ctx1, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Calculated Value',
+          data: [],
+          borderColor: 'rgba(75, 192, 192, 1)',
+          backgroundColor: 'rgba(75, 192, 192, 0.2)',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          x: { title: { display: true, text: 'Timestamp' } },
+          y: { title: { display: true, text: 'Value' } }
+        }
+      }
+    });
+
+    const ctx2 = document.getElementById('sourceChart').getContext('2d');
+    sourceChart = new Chart(ctx2, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: 'Source Value 1',
+            data: [],
+            borderColor: 'rgba(255, 99, 132, 1)',
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+            borderWidth: 1
+          },
+          {
+            label: 'Source Value 2',
+            data: [],
+            borderColor: 'rgba(54, 162, 235, 1)',
+            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+            borderWidth: 1
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          x: { title: { display: true, text: 'Timestamp' } },
+          y: { title: { display: true, text: 'Value' } }
+        }
+      }
+    });
+  }
+
+  // Update the charts with new data
+  function updateGraph(data) {
+    const timestamp = new Date(data.timestamp).toLocaleTimeString();
+    const calculatedValue = parseFloat(data.calculated_value);
+    const sourceValue1 = parseFloat(data.source_value_1);
+    const sourceValue2 = parseFloat(data.source_value_2);
+
+    // Update Calculated Value Chart
+    chart.data.labels.push(timestamp);
+    chart.data.datasets[0].data.push(calculatedValue);
+    if (chart.data.labels.length > 10) {
+      chart.data.labels.shift();
+      chart.data.datasets[0].data.shift();
+    }
+    chart.update();
+
+    // Update Source Values Chart
+    sourceChart.data.labels.push(timestamp);
+    sourceChart.data.datasets[0].data.push(sourceValue1);
+    sourceChart.data.datasets[1].data.push(sourceValue2);
+    if (sourceChart.data.labels.length > 10) {
+      sourceChart.data.labels.shift();
+      sourceChart.data.datasets[0].data.shift();
+      sourceChart.data.datasets[1].data.shift();
+    }
+    sourceChart.update();
+  }
+
+  // Display data in the table
+  function displayData(data) {
+    const tableBody = document.getElementById('data-table-body');
+    tableBody.innerHTML = `
+        <tr>
+          <td class="px-4 py-2 border">ID</td>
+          <td class="px-4 py-2 border">${data.id}</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 border">Calculated Value</td>
+          <td class="px-4 py-2 border">${data.calculated_value}</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 border">Solar Panel</td>
+          <td class="px-4 py-2 border">${data.source_value_1}</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 border">The Grid</td>
+          <td class="px-4 py-2 border">${data.source_value_2}</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 border">Timestamp</td>
+          <td class="px-4 py-2 border">${new Date(data.timestamp).toLocaleString()}</td>
+        </tr>
+      `;
+  }
+
+  // Fetch data from the API
+  async function fetchData() {
+    try {
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      displayData(data);
+      updateGraph(data);
+    } catch (error) {
+      document.getElementById('data-container').innerHTML = `<p class="text-red-500">Error: ${error.message}</p>`;
+    }
+  }
+
+  // Initialize the graphs and fetch data periodically
+  createGraph();
+  fetchData();
+  setInterval(fetchData, 3000);
+</script>
+</body>
+</html>
