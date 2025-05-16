@@ -31,7 +31,22 @@
         </tr>
         </thead>
         <tbody id="data-table-body">
-        <!-- Data rows will be dynamically inserted here -->
+        <!-- Real Data Section -->
+        <tr>
+          <td colspan="2" class="px-4 py-2 border bg-gray-100 font-semibold">Real Data</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 border">ID</td>
+          <td class="px-4 py-2 border">1</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 border">Calculated Value</td>
+          <td class="px-4 py-2 border">123.45</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 border">Solar Panel</td>
+          <td class="px-4 py-2 border">67.89</td>
+        </tr>
         </tbody>
       </table>
     </div>
@@ -50,11 +65,42 @@
       <canvas id="sourceChart" class="w-full"></canvas>
     </div>
   </div>
+
+  <!-- New Section for API Data -->
+  <div id="api-data-container" class="bg-white shadow-md rounded-lg p-4 mt-6">
+    <h2 class="text-xl font-semibold mb-4">API Data</h2>
+    <div class="overflow-x-auto">
+      <table class="table-auto w-full text-left border-collapse">
+        <thead>
+        <tr class="bg-gray-200">
+          <th class="px-4 py-2 border">ID</th>
+          <th class="px-4 py-2 border">Battery Level Before</th>
+          <th class="px-4 py-2 border">Battery % Before</th>
+          <th class="px-4 py-2 border">Battery Level After</th>
+          <th class="px-4 py-2 border">Battery % After</th>
+          <th class="px-4 py-2 border">Solar Power</th>
+          <th class="px-4 py-2 border">Grid Power</th>
+          <th class="px-4 py-2 border">Usage</th>
+          <th class="px-4 py-2 border">Surplus</th>
+          <th class="px-4 py-2 border">Current Price</th>
+          <th class="px-4 py-2 border">Avg Price</th>
+          <th class="px-4 py-2 border">Decision</th>
+          <th class="px-4 py-2 border">Decision Reason</th>
+          <th class="px-4 py-2 border">Timestamp</th>
+        </tr>
+        </thead>
+        <tbody id="api-data-table-body">
+        <!-- API Data will be dynamically inserted here -->
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <script>
   const apiUrl = 'http://localhost:8000/api/latest-result/';
   const progressApiUrl = 'http://localhost:8000/api/server-data/';
+  const apiDataUrl = 'http://localhost:8000/api/optimization-decisions/';
   let chart, sourceChart;
 
   // Initialize the charts
@@ -168,6 +214,34 @@
       `;
   }
 
+  // Display API data in the new table
+  function displayApiData(dataArray) {
+    const tableBody = document.getElementById('api-data-table-body');
+    tableBody.innerHTML = ''; // Clear existing rows
+
+    dataArray.forEach((data) => {
+      const row = `
+      <tr>
+        <td class="px-4 py-2 border">${data.id}</td>
+        <td class="px-4 py-2 border">${data.battery_level_before}</td>
+        <td class="px-4 py-2 border">${data.battery_percentage_before}</td>
+        <td class="px-4 py-2 border">${data.battery_level_after}</td>
+        <td class="px-4 py-2 border">${data.battery_percentage_after}</td>
+        <td class="px-4 py-2 border">${data.solar_power}</td>
+        <td class="px-4 py-2 border">${data.grid_power}</td>
+        <td class="px-4 py-2 border">${data.usage}</td>
+        <td class="px-4 py-2 border">${data.surplus}</td>
+        <td class="px-4 py-2 border">${data.current_price}</td>
+        <td class="px-4 py-2 border">${data.avg_price}</td>
+        <td class="px-4 py-2 border">${data.decision}</td>
+        <td class="px-4 py-2 border">${data.decision_reason}</td>
+        <td class="px-4 py-2 border">${new Date(data.timestamp).toLocaleString()}</td>
+      </tr>
+    `;
+      tableBody.innerHTML += row;
+    });
+  }
+
   // Fetch data from the API
   async function fetchData() {
     try {
@@ -181,6 +255,21 @@
       updateGraph(data);
     } catch (error) {
       document.getElementById('data-container').innerHTML = `<p class="text-red-500">Error: ${error.message}</p>`;
+    }
+  }
+
+  // Fetch API data for the new section
+  async function fetchApiData() {
+    try {
+      const response = await fetch(apiDataUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      displayApiData(data);
+    } catch (error) {
+      document.getElementById('api-data-container').innerHTML = `<p class="text-red-500">Error: ${error.message}</p>`;
     }
   }
 
@@ -206,8 +295,10 @@
   // Initialize the graphs and fetch data periodically
   createGraph();
   fetchData();
+  fetchApiData();
   updateProgressBar();
   setInterval(fetchData, 3000);
+  setInterval(fetchApiData, 3000);
   setInterval(updateProgressBar, 3000);
 </script>
 </body>
