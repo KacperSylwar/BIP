@@ -1,10 +1,14 @@
+# Importy
 from celery import shared_task
 from zeep import Client
 from zeep.transports import Transport
 from requests import Session
 from requests.auth import HTTPDigestAuth
-from .models import ServerData, CalculatedResult,SimulatedSolarAndGridPower, SimulatedBattery, OptimizationDecision
+from .models import (ServerData, CalculatedResult, SimulatedSolarAndGridPower,
+                    SimulatedBattery, OptimizationDecision, PriceArea, ElectricityPrice)
 from django.utils import timezone
+from django.db.models import Avg
+from decimal import Decimal
 import logging
 import time
 import random
@@ -16,7 +20,7 @@ logger = logging.getLogger(__name__)
 WSDL_URL = 'http://172.16.16.60/EWS/DataExchange.svc?wsdl'
 USERNAME = 'kvk'
 PASSWORD = 'KvK-DataAccess1'
-VALUE_IDS = ["4@1042@V", "7@1042@V",'9@-685@V']
+VALUE_IDS = ["4@1042@V", "7@1042@V", '9@-685@V']
 
 
 @shared_task
@@ -173,107 +177,35 @@ def calculate_power_exchange():
 
 
 @shared_task
-def simulate_solar_and_grid_power():
-    """
-    Zadanie symulujące produkcję energii z paneli solarnych oraz pobór z sieci.
-    Wartości zmieniają się w sposób realistyczny, uwzględniając porę dnia.
-    """
-    logger.info("Rozpoczynam symulację mocy paneli solarnych i poboru z sieci")
-
-    try:
-        # Pobierz aktualny czas, aby symulować zależność od pory dnia
-        current_time = timezone.now()
-        hour = current_time.hour
-
-        # Symulacja mocy paneli solarnych (dzień/noc)
-        if 6 <= hour < 22:  # Dzień
-            # Symulacja krzywej dziennej (wyższa w środku dnia)
-            hour_factor = 1.0 - abs(hour - 14) / 8.0  # Szczyt o 14:00
-            base_solar = 2000 * hour_factor  # Maksymalna moc 2000W
-            solar_power = base_solar * (1 + random.uniform(-0.1, 0.1))
-        else:  # Noc
-            solar_power = random.uniform(0, 10)  # W nocy minimalna moc
-
-        # Symulacja zużycia energii (usage)
-        base_usage = 1200  # Podstawowe zużycie 1000W
-
-        if 6 <= hour < 9 or 18 <= hour < 23:  # Rano lub wieczór
-            usage_factor = 1.5  # Zwiększone zużycie
-        elif 23 <= hour or hour < 6:  # Noc
-            usage_factor = 0.5  # Zmniejszone zużycie
-        else:  # Dzień
-            usage_factor = 1.0  # Normalne zużycie
-
-        usage = base_usage * usage_factor * (1 + random.uniform(-0.2, 0.2))
-
-        # Obliczenie poboru z sieci
-        grid_power = max(0, usage - solar_power)
-
-        # Zapisz lub zaktualizuj dane
-        power_data, created = SimulatedSolarAndGridPower.objects.get_or_create(
-            pk=1,  # Zawsze używamy tego samego rekordu
-            defaults={
-                'solar_power': solar_power,
-                'grid_power': grid_power,
-                'usage': usage
-            }
-        )
-
-        if not created:
-            power_data.solar_power = solar_power
-            power_data.grid_power = grid_power
-            power_data.usage = usage
-            power_data.save()
-
-        logger.info(f"Symulacja zakończona: Solar={solar_power:.2f}W, Grid={grid_power:.2f}W, Usage={usage:.2f}W")
-        return "Zaktualizowano dane symulacji mocy"
-
-    except Exception as e:
-        msg = f"Błąd podczas symulacji mocy: {str(e)}"
-        logger.error(msg, exc_info=True)
-        return msg
-
-
-from celery import shared_task
-from django.utils import timezone
-from django.db.models import Avg
-from decimal import Decimal
-import logging
-from .models import SimulatedBattery, SimulatedSolarAndGridPower, ElectricityPrice, PriceArea
-
-logger = logging.getLogger(__name__)
-
-
-@shared_task
 def optimize_energy_usage():
     """
-    Zadanie optymalizujące zarządzanie energią w zależności od:
-    - stopnia naładowania baterii
-    - aktualnej produkcji energii solarnej
-    - bieżącego zużycia energii
-    - aktualnych i przewidywanych cen energii
+    Task that optimizes energy management based on:
+    - battery charge level
+    - current solar energy production
+    - current energy consumption
+    - current and forecasted energy prices
     """
     try:
-        # 1. Pobierz dane o baterii
+        # 1. Get battery data
         battery = SimulatedBattery.objects.first()
         if not battery:
-            logger.error("Brak danych o baterii w systemie")
-            return "Błąd: brak danych o baterii"
+            logger.error("No battery data in the system")
+            return "Error: no battery data"
 
-        # 2. Pobierz aktualne dane o produkcji/zużyciu
+        # 2. Get current production/consumption data
         power_data = SimulatedSolarAndGridPower.objects.first()
         if not power_data:
-            logger.error("Brak danych o produkcji/zużyciu w systemie")
-            return "Błąd: brak danych o produkcji/zużyciu"
+            logger.error("No production/consumption data in the system")
+            return "Error: no production/consumption data"
 
-        # 3. Oblicz nadwyżkę/deficyt energii
+        # 3. Calculate energy surplus/deficit
         surplus = float(power_data.solar_power) - float(power_data.usage)
 
-        # 4. Pobierz aktualną cenę energii (dla pierwszego dostępnego obszaru cenowego)
+        # 4. Get current energy price (for the first available price area)
         price_area = PriceArea.objects.first()
         if not price_area:
-            logger.warning("Brak obszaru cenowego w systemie")
-            return "Błąd: brak obszarów cenowych"
+            logger.warning("No price area in the system")
+            return "Error: no price areas"
 
         current_hour = timezone.now().replace(minute=0, second=0, microsecond=0)
         current_price = ElectricityPrice.objects.filter(
@@ -283,78 +215,78 @@ def optimize_energy_usage():
         ).first()
 
         if not current_price:
-            logger.warning("Brak aktualnych cen energii")
-            return "Błąd: brak aktualnych cen energii"
+            logger.warning("No current energy prices")
+            return "Error: no current energy prices"
 
-        # 5. Wylicz średnią cenę z ostatnich 24h dla porównania
+        # 5. Calculate average price from last 24h for comparison
         last_24h = timezone.now() - timezone.timedelta(hours=24)
         avg_price = ElectricityPrice.objects.filter(
             area=price_area,
             timestamp__gte=last_24h
         ).aggregate(avg=Avg('price'))['avg'] or 0
 
-        # 6. Parametry decyzyjne
+        # 6. Decision parameters
         battery_charge_percent = (float(battery.current_charge) / float(battery.capacity)) * 100
-        price_is_good = float(current_price.price) > float(avg_price) * 1.1  # 10% powyżej średniej
+        price_is_high = float(current_price.price) > float(avg_price) * 1.1  # Price is high when 10% above average
 
-        # 7. Logika podejmowania decyzji
+        # 7. Decision logic
         decision = ""
         decision_reason = ""
         battery_level_before = float(battery.current_charge)
         new_charge = float(battery.current_charge)
 
-        if surplus > 0:  # Nadwyżka energii
-            # ZMIANA: Jeśli bateria jest pełna, zawsze sprzedaj nadwyżkę
-            if battery_charge_percent >= 99.9:  # Praktycznie 100% (uwzględniając niedokładność)
-                decision = f"SPRZEDAŻ DO SIECI: Nadwyżka {surplus:.2f}W, cena {current_price.price} {current_price.currency}"
-                decision_reason = (f"Bateria jest w pełni naładowana ({battery_charge_percent:.2f}%), "
-                                  f"więc sprzedajemy całą nadwyżkę niezależnie od ceny ({current_price.price}).")
-                logger.info(f"Decyzja: {decision}")
-            elif battery_charge_percent >= 80 and price_is_good:
-                # Sprzedaj nadwyżkę do sieci
-                decision = f"SPRZEDAŻ DO SIECI: Nadwyżka {surplus:.2f}W, cena {current_price.price} {current_price.currency}"
-                decision_reason = (f"Bateria naładowana w {battery_charge_percent:.2f}% (powyżej 80%), "
-                                  f"a aktualna cena ({current_price.price}) jest korzystna "
-                                  f"(powyżej średniej {avg_price:.2f}), więc sprzedajemy nadwyżkę.")
-                logger.info(f"Decyzja: {decision}")
+        if surplus > 0:  # Energy surplus
+            # If battery is full, always sell surplus
+            if battery_charge_percent >= 99.9:  # Practically 100% (considering precision)
+                decision = f"SELL TO GRID: Surplus {surplus:.2f}W, price {current_price.price} {current_price.currency}"
+                decision_reason = (f"Battery is fully charged ({battery_charge_percent:.2f}%), "
+                                  f"so we're selling all surplus regardless of price ({current_price.price}).")
+                logger.info(f"Decision: {decision}")
+            elif battery_charge_percent >= 80 and price_is_high:
+                # Sell surplus to the grid when price is high
+                decision = f"SELL TO GRID: Surplus {surplus:.2f}W, price {current_price.price} {current_price.currency}"
+                decision_reason = (f"Battery charged to {battery_charge_percent:.2f}% (above 80%), "
+                                  f"and current price ({current_price.price}) is high "
+                                  f"(above average {avg_price:.2f}), so we're selling the surplus.")
+                logger.info(f"Decision: {decision}")
             else:
-                # Ładuj baterię nadwyżką
+                # Charge battery with surplus
                 energy_to_charge = min(surplus, float(battery.capacity) - float(battery.current_charge))
                 new_charge += energy_to_charge
-                decision = f"ŁADOWANIE BATERII: {energy_to_charge:.2f}W z nadwyżki {surplus:.2f}W"
+                decision = f"CHARGE BATTERY: {energy_to_charge:.2f}W from surplus {surplus:.2f}W"
                 if battery_charge_percent >= 80:
-                    decision_reason = (f"Bateria naładowana w {battery_charge_percent:.2f}%, ale aktualna cena "
-                                      f"({current_price.price}) nie jest wystarczająco korzystna (średnia: {avg_price:.2f}).")
+                    decision_reason = (f"Battery charged to {battery_charge_percent:.2f}%, but current price "
+                                      f"({current_price.price}) is not high enough (average: {avg_price:.2f}).")
                 else:
-                    decision_reason = (f"Bateria naładowana tylko w {battery_charge_percent:.2f}% (poniżej 80%), "
-                                      f"więc priorytetem jest ładowanie baterii.")
-                logger.info(f"Decyzja: {decision}")
-        else:  # Deficyt energii
-            if battery_charge_percent > 20 and not price_is_good:
-                # Rozładuj baterię aby pokryć deficyt
+                    decision_reason = (f"Battery charged only to {battery_charge_percent:.2f}% (below 80%), "
+                                      f"so charging the battery is a priority.")
+                logger.info(f"Decision: {decision}")
+        else:  # Energy deficit
+            if battery_charge_percent > 20 and price_is_high:
+                # Discharge battery when price is HIGH
                 energy_from_battery = min(abs(surplus), float(battery.current_charge) - float(battery.capacity) * 0.2)
                 new_charge -= energy_from_battery
-                decision = f"ROZŁADOWANIE BATERII: {energy_from_battery:.2f}W na pokrycie deficytu {abs(surplus):.2f}W"
-                decision_reason = (f"Bateria naładowana w {battery_charge_percent:.2f}% (powyżej 20%), "
-                                  f"a aktualna cena ({current_price.price}) jest niekorzystna "
-                                  f"(poniżej lub blisko średniej {avg_price:.2f}), więc używamy energii z baterii.")
-                logger.info(f"Decyzja: {decision}")
+                decision = f"DISCHARGE BATTERY: {energy_from_battery:.2f}W to cover deficit {abs(surplus):.2f}W"
+                decision_reason = (f"Battery charged to {battery_charge_percent:.2f}% (above 20%), "
+                                  f"and current price ({current_price.price}) is high "
+                                  f"(above average {avg_price:.2f}), so we're using battery energy.")
+                logger.info(f"Decision: {decision}")
             else:
-                # Pobierz energię z sieci
-                decision = f"POBÓR Z SIECI: {abs(surplus):.2f}W, cena {current_price.price} {current_price.currency}"
+                # Get energy from grid
+                decision = f"DRAW FROM GRID: {abs(surplus):.2f}W, price {current_price.price} {current_price.currency}"
                 if battery_charge_percent <= 20:
-                    decision_reason = (f"Bateria naładowana tylko w {battery_charge_percent:.2f}% (poniżej 20%), "
-                                      f"więc chronimy pozostałą energię w baterii.")
+                    decision_reason = (f"Battery charged only to {battery_charge_percent:.2f}% (below 20%), "
+                                      f"so we're protecting remaining battery energy.")
                 else:
-                    decision_reason = (f"Aktualna cena ({current_price.price}) jest korzystna "
-                                      f"(powyżej średniej {avg_price:.2f}), więc opłaca się kupić z sieci.")
-                logger.info(f"Decyzja: {decision}")
+                    decision_reason = (f"Current price ({current_price.price}) is low "
+                                      f"(below average {avg_price:.2f}), so it's cost-effective to buy from the grid.")
+                logger.info(f"Decision: {decision}")
 
-        # 8. Aktualizuj stan baterii
+        # 8. Update battery state
         battery.current_charge = Decimal(str(new_charge))
         battery.save()
 
-        # 9. Zapisz historię decyzji
+        # 9. Save decision history
         OptimizationDecision.objects.create(
             battery_level_before=battery_level_before,
             battery_percentage_before=battery_charge_percent,
@@ -370,10 +302,10 @@ def optimize_energy_usage():
             decision_reason=decision_reason
         )
 
-        return f"Zoptymalizowano użycie energii: {decision}"
+        return f"Energy usage optimized: {decision}"
 
     except Exception as e:
-        msg = f"Błąd podczas optymalizacji zarządzania energią: {str(e)}"
+        msg = f"Error during energy management optimization: {str(e)}"
         logger.error(msg, exc_info=True)
         return msg
 
@@ -457,5 +389,82 @@ def generate_electricity_prices():
 
     except Exception as e:
         msg = f"Błąd podczas generowania cen energii: {str(e)}"
+        logger.error(msg, exc_info=True)
+        return msg
+
+
+@shared_task
+def simulate_solar_and_grid_power():
+    """Generowanie realistycznych danych o produkcji solarnej i zużyciu energii"""
+    try:
+        logger.info("Generowanie danych o produkcji i zużyciu energii")
+
+        # Określ aktualną godzinę dnia dla realistycznej produkcji solarnej
+        current_hour = timezone.now().hour - 2
+
+        # Maksymalna możliwa moc instalacji solarnej (W)
+        max_solar_capacity = 5000.0
+
+        # Profil produkcji solarnej w zależności od pory dnia (0-1 jako % maksymalnej mocy)
+        solar_profile = {
+            0: 0.00, 1: 0.00, 2: 0.00, 3: 0.00, 4: 0.00, 5: 0.02,
+            6: 0.10, 7: 0.25, 8: 0.45, 9: 0.65, 10: 0.80, 11: 0.93,
+            12: 0.98, 13: 0.95, 14: 0.85, 15: 0.70, 16: 0.55, 17: 0.35,
+            18: 0.15, 19: 0.05, 20: 0.00, 21: 0.00, 22: 0.00, 23: 0.00
+        }
+
+        # Współczynnik dla aktualnej godziny z niewielką losową wariancją
+        solar_factor = solar_profile.get(current_hour, 0.0)
+        solar_factor *= (1 + random.uniform(-0.2, 0.1))  # Dodaj losową zmienność (-20% do +10%)
+
+        # Oblicz produkcję solarną
+        solar_power = max_solar_capacity * solar_factor
+
+        # Symuluj zużycie energii (podstawowe + zmienne)
+        base_usage = 1100.0  # Stałe zużycie bazowe (W)
+
+        # Profil zużycia w zależności od pory dnia (współczynnik)
+        usage_profile = {
+            0: 0.6, 1: 0.5, 2: 0.5, 3: 0.5, 4: 0.5, 5: 0.6,
+            6: 0.8, 7: 1.1, 8: 1.3, 9: 1.2, 10: 1.1, 11: 1.0,
+            12: 1.0, 13: 1.0, 14: 1.0, 15: 1.1, 16: 1.2, 17: 1.4,
+            18: 1.6, 19: 1.7, 20: 1.5, 21: 1.3, 22: 1.0, 23: 0.8
+        }
+
+        usage_factor = usage_profile.get(current_hour, 1.0)
+        usage_factor *= (1 + random.uniform(-0.1, 0.1))  # Dodaj losową zmienność (-10% do +10%)
+
+        # Oblicz zużycie energii
+        usage = base_usage * usage_factor
+
+        # Oblicz bilans mocy (dodatni: nadwyżka, ujemny: deficyt)
+        power_balance = solar_power - usage
+
+        # Zależnie od bilansu, określ moc pobieraną/oddawaną do sieci
+        if power_balance >= 0:
+            # Nadwyżka - możemy oddawać do sieci
+            grid_power = -power_balance  # Wartość ujemna oznacza oddawanie do sieci
+        else:
+            # Deficyt - musimy pobierać z sieci
+            grid_power = -power_balance  # Wartość dodatnia oznacza pobór z sieci
+
+        # Zapisz lub zaktualizuj dane w bazie
+        power_data, created = SimulatedSolarAndGridPower.objects.update_or_create(
+            id=1,
+            defaults={
+                'solar_power': round(Decimal(str(solar_power)), 2),
+                'grid_power': round(Decimal(str(grid_power)), 2),
+                'usage': round(Decimal(str(usage)), 2),
+                'timestamp': timezone.now()
+            }
+        )
+
+        logger.info(f"Wygenerowano dane: Solar={power_data.solar_power}W, "
+                    f"Grid={power_data.grid_power}W, Usage={power_data.usage}W")
+
+        return f"Wygenerowano dane o produkcji i zużyciu energii: Solar={power_data.solar_power}W"
+
+    except Exception as e:
+        msg = f"Błąd podczas symulacji mocy: {str(e)}"
         logger.error(msg, exc_info=True)
         return msg

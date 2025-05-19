@@ -23,20 +23,12 @@ def fetch_and_calculate():
 
 # Harmonogram zadań
 app.conf.beat_schedule = {
-    'fetch-server-data': {
-        'task': 'nordpool.tasks.fetch_server_data',
-        'schedule': timedelta(seconds=5),
-    },
     'simulate-solar-and-grid-power': {
         'task': 'nordpool.tasks.simulate_solar_and_grid_power',
         'schedule': timedelta(seconds=5),
     },
 'optimize-energy-usage': {
     'task': 'nordpool.tasks.optimize_energy_usage',
-    'schedule': timedelta(seconds=5),
-},
-'generate-electricity-prices': {
-    'task': 'nordpool.tasks.generate_electricity_prices',
-    'schedule': timedelta(seconds=5),  # Uruchamiane co godzinę
+    'schedule': timedelta(seconds=5),  # Uruchamiane co minutę
 },
 }

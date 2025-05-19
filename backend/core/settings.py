@@ -25,7 +25,21 @@ SECRET_KEY = 'django-insecure--iwyhd@j6+x278qrx0d57xfrq69=lc5f&4td(-^gn@%&h6nrc4
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+# Poprawna konfiguracja ALLOWED_HOSTS - bez portów
+ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+
+# Rozszerzona konfiguracja CORS
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:8080',
+    'http://localhost:3000',
+    'http://localhost:8001',
+    'http://127.0.0.1:8080',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:8001',
+]
+
+# Dodatkowe ustawienia CORS dla większej elastyczności
+CORS_ALLOW_CREDENTIALS = True
 
 
 # Application definition
@@ -134,7 +148,3 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
-
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:8080',  # Frontend URL
-]
